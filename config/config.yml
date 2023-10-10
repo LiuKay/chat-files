@@ -1,0 +1,38 @@
+
+llm: huggingface
+model_type: online # online,local,download
+
+
+embeddings:
+  model: sentence-transformers/all-MiniLM-L6-v2
+#  model: hkunlp/instructor-large
+#  model_kwargs:
+#    device: cuda
+
+ctransformers:
+  model: TheBloke/Wizard-Vicuna-7B-Uncensored-GGML
+  model_file: Wizard-Vicuna-7B-Uncensored.ggmlv3.q4_0.bin
+  model_type: llama
+  config:
+    context_length: 1024
+
+gptq:
+  model: TheBloke/Wizard-Vicuna-7B-Uncensored-GPTQ
+  model_file: Wizard-Vicuna-7B-Uncensored-GPTQ-4bit-128g.no-act-order.safetensors
+  pipeline_kwargs:
+    max_new_tokens: 256
+
+huggingface:
+  model: tiiuae/falcon-7b-instruct
+  model_kwargs:
+    temperature: 0.1
+    max_length: 2000
+    max_new_tokens: 2000
+    #trust_remote_code: true
+  pipeline_kwargs:
+    max_new_tokens: 4000
+
+openai:
+  model: gpt-3.5-turbo-16k
+  temperature: 0.0
+  max_tokens: 2000
