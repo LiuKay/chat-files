@@ -1,4 +1,9 @@
 
+chroma:
+  persist_directory: db/chroma/
+  anonymized_telemetry: false
+
+
 llm: huggingface
 model_type: online # online,local,download
 
