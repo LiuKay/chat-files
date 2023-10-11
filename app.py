@@ -18,6 +18,7 @@ from langchain.vectorstores import Chroma
 from config import get_config
 from embeddings import get_embeddings_from_config
 from llm import get_llm_from_config
+from prompts import QA_PROMPT_MAP
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ def main():
     vector_store = init_vector_store(conf, embeddings)
     qa_chain = RetrievalQA.from_llm(
         llm=llm,
+        prompt=QA_PROMPT_MAP.get(conf['prompt_style']).get_prompt(llm),
         retriever=vector_store.as_retriever(
             search_type="similarity_score_threshold",
             search_kwargs={

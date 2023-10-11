@@ -12,6 +12,7 @@ splitter:
 
 llm: huggingface
 model_type: online # online,local,download
+prompt_style: normal # normal or llama2
 
 
 embeddings:
