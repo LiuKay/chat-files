@@ -13,17 +13,13 @@ The main value props of LangChain are:
 
 Off-the-shelf chains make it easy to get started. For complex applications, components make it easy to customize existing chains and build new ones.
 
+
 ## Chainlit
 
-Chainlit is an open-source Python package that makes it incredibly fast to build Chat GPT like applications with your own business logic and data.
-
+**Chainlit** is an open-source Python package that makes it incredibly fast to build ChatGPT like applications with your own business logic and data.
 Key features of Chainlit:
 1.Build fast: Integrate seamlessly with an existing code base or start from scratch in minutes
-
 2.Data persistence: Leverage user generated data + feedback.
-
 3.Visualize multi-steps reasoning: Understand the intermediary steps that produced an output at a glance
-
 4.Iterate on prompts: Deep dive into prompts in the Prompt Playground to understand where things went wrong and iterate
-
 Chainlit is compatible with all Python programs and libraries. That being said, it comes with a set of integrations with popular libraries and frameworks.

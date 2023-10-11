@@ -1,15 +1,17 @@
 import glob
 import logging
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 import chainlit as cl
 import chromadb
+from chainlit import Message, Text
 from chromadb import Embeddings
 from langchain.chains import RetrievalQA
 from langchain.document_loaders import UnstructuredWordDocumentLoader, CSVLoader, EverNoteLoader, \
     UnstructuredEPubLoader, UnstructuredHTMLLoader, UnstructuredMarkdownLoader, UnstructuredODTLoader, PDFMinerLoader, \
     UnstructuredPowerPointLoader, TextLoader
+from langchain.schema import Document
 from langchain.text_splitter import NLTKTextSplitter
 from langchain.vectorstores import Chroma
 
@@ -46,7 +48,12 @@ async def main(message: str):
     qa_chain = cl.user_session.get("qa_chain")  # type: RetrievalQA
     res = await qa_chain.acall(message, callbacks=[cl.AsyncLangchainCallbackHandler()])
     logger.info(f"response is {res}")
-    await cl.Message(content=res["result"]).send()
+
+    answer = res["result"]
+    source_docs = res.get("source_documents")
+    res_msg = cl.Message(content=answer)
+    add_source_docs(res_msg, source_docs)
+    await res_msg.send()
 
 
 def init_vector_store(conf: Dict[str, Any], embedding: Optional[Embeddings] = None):
@@ -104,3 +111,15 @@ LOADER_MAPPING = {
     ".txt": (TextLoader, {"encoding": "utf8"}),
     # Add more mappings for other file extensions and loaders as needed
 }
+
+
+def add_source_docs(message: Message, source_docs: Optional[List[Document]]):
+    if source_docs:
+        message.elements = [
+            Text(name=f"{i + 1}. {doc.metadata.get('source')}", content=doc.page_content)
+            for i, doc in enumerate(source_docs)
+        ]
+        source_refs = "\n".join(
+            [f"{i + 1}. {doc.metadata.get('source')}" for i, doc in enumerate(source_docs)]
+        )
+        message.content += f"\n\n**_Source Documents_**: \n{source_refs}"
