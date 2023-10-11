@@ -1,6 +1,5 @@
 import logging
 import os
-from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 
 from langchain import HuggingFaceHub, HuggingFacePipeline
@@ -16,10 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 def get_llm_from_config(
+        config: Dict[str, Any],
         callback: Optional[Callable[[str], None]] = None,
         temperature=None,
 ):
-    conf = get_config(os.getenv("CONFIG_FILE"))
+    conf = config or get_config(os.getenv("CONFIG_FILE"))
     return get_llm(conf, callback=callback, temperature=temperature)
 
 
@@ -55,9 +55,6 @@ def get_llm(config: Dict[str, Any],
             if temperature:
                 config = merge(config, {"config": {"temperature": temperature}})
             llm = CTransformers(callbacks=callbacks, **config)
-        elif config["llm"] == "gptq":
-            logger.info(f"Use gptq...local_files_only={local_files_only}")
-            llm = get_gptq_llm(config)
         else:
             logger.info(f"Use HuggingFace local model...local_files_only={local_files_only}")
             config = {**config["huggingface"]}
@@ -65,51 +62,3 @@ def get_llm(config: Dict[str, Any],
             config = merge(config, {"model_kwargs": {"local_files_only": local_files_only}})
             llm = HuggingFacePipeline.from_model_id(task="text-generation", **config)
     return llm
-
-
-def get_gptq_llm(config: Dict[str, Any]) -> LLM:
-    try:
-        from auto_gptq import AutoGPTQForCausalLM
-    except ImportError:
-        raise ImportError(
-            "Could not import `auto_gptq` package. "
-            "Please install it with `pip install chatdocs[gptq]`"
-        )
-
-    from transformers import (
-        AutoTokenizer,
-        TextGenerationPipeline,
-        MODEL_FOR_CAUSAL_LM_MAPPING,
-    )
-
-    local_files_only = not config["download"]
-    config = {**config["gptq"]}
-    model_name_or_path = config.pop("model")
-    model_file = config.pop("model_file", None)
-    pipeline_kwargs = config.pop("pipeline_kwargs", None) or {}
-
-    model_basename = None
-    use_safetensors = False
-    if model_file:
-        model_basename = Path(model_file).stem
-        use_safetensors = model_file.endswith(".safetensors")
-
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name_or_path,
-        local_files_only=local_files_only,
-    )
-    model = AutoGPTQForCausalLM.from_quantized(
-        model_name_or_path,
-        model_basename=model_basename,
-        use_safetensors=use_safetensors,
-        local_files_only=local_files_only,
-        **config,
-    )
-    MODEL_FOR_CAUSAL_LM_MAPPING.register("dragonflychatbot-gptq", model.__class__)
-    pipeline = TextGenerationPipeline(
-        task="text-generation",
-        model=model,
-        tokenizer=tokenizer,
-        **pipeline_kwargs,
-    )
-    return HuggingFacePipeline(pipeline=pipeline)

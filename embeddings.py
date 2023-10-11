@@ -9,8 +9,8 @@ from config import get_config
 logger = logging.getLogger(__name__)
 
 
-def get_embeddings_from_config():
-    conf = get_config(os.getenv("CONFIG_FILE"))
+def get_embeddings_from_config(config: Dict[str, Any]):
+    conf = config or get_config(os.getenv("CONFIG_FILE"))
     return get_embeddings(conf)
 
 

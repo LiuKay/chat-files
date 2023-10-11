@@ -1,8 +1,14 @@
 
+persist_dir: db/
+knowledge_base_dir: data/
+
 chroma:
   persist_directory: db/chroma/
   anonymized_telemetry: false
 
+splitter:
+  chunk_size: 2048
+  chunk_overlap: 50
 
 llm: huggingface
 model_type: online # online,local,download
@@ -21,11 +27,6 @@ ctransformers:
   config:
     context_length: 1024
 
-gptq:
-  model: TheBloke/Wizard-Vicuna-7B-Uncensored-GPTQ
-  model_file: Wizard-Vicuna-7B-Uncensored-GPTQ-4bit-128g.no-act-order.safetensors
-  pipeline_kwargs:
-    max_new_tokens: 256
 
 huggingface:
   model: tiiuae/falcon-7b-instruct

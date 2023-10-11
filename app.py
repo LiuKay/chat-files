@@ -1,32 +1,39 @@
+import glob
+import logging
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import chainlit as cl
 import chromadb
-from chromadb import Settings
+from chromadb import Embeddings
 from langchain.chains import RetrievalQA
+from langchain.document_loaders import UnstructuredWordDocumentLoader, CSVLoader, EverNoteLoader, \
+    UnstructuredEPubLoader, UnstructuredHTMLLoader, UnstructuredMarkdownLoader, UnstructuredODTLoader, PDFMinerLoader, \
+    UnstructuredPowerPointLoader, TextLoader
+from langchain.text_splitter import NLTKTextSplitter
 from langchain.vectorstores import Chroma
 
 from config import get_config
 from embeddings import get_embeddings_from_config
 from llm import get_llm_from_config
 
+logger = logging.getLogger(__name__)
+
 
 @cl.on_chat_start
 def main():
-    llm = get_llm_from_config()
     conf = get_config(os.getenv("CONFIG_FILE"))
-    chroma_client = create_chroma_client(conf)
-    vector_store = Chroma(
-        collection_name="test",
-        embedding_function=get_embeddings_from_config(),
-        client=chroma_client,
-        client_settings=chroma_client.get_settings(),
-    )
+    llm = get_llm_from_config(conf)
+    embeddings = get_embeddings_from_config(conf)
+    vector_store = init_vector_store(conf, embeddings)
     qa_chain = RetrievalQA.from_llm(
         llm=llm,
         retriever=vector_store.as_retriever(
             search_type="similarity_score_threshold",
+            search_kwargs={
+                'k': 2,
+                'fetch_k': 10,
+                'score_threshold': 0.5}
         ),
         return_source_documents=True,
         verbose=True
@@ -38,11 +45,62 @@ def main():
 async def main(message: str):
     qa_chain = cl.user_session.get("qa_chain")  # type: RetrievalQA
     res = await qa_chain.acall(message, callbacks=[cl.AsyncLangchainCallbackHandler()])
-    await cl.Message(content=res["text"]).send()
+    logger.info(f"response is {res}")
+    await cl.Message(content=res["result"]).send()
 
 
-def create_chroma_client(conf: Dict[str, Any]):
+def init_vector_store(conf: Dict[str, Any], embedding: Optional[Embeddings] = None):
+    knowledge_base_dir = conf["knowledge_base_dir"]
+    logger.info(f"loading docs from {knowledge_base_dir}...")
+    docs = load_documents(knowledge_base_dir)
+    splitter_config = conf["splitter"]
+    text_splitter = NLTKTextSplitter(**splitter_config)
+    documents = text_splitter.split_documents(docs)
     chroma_settings = conf["chroma"]
-    persist_dir = chroma_settings["persist_directory"]
-    chroma_client = chromadb.PersistentClient(path=persist_dir, settings=Settings(**chroma_settings))
-    return chroma_client
+    db = Chroma.from_documents(
+        documents,
+        embedding,
+        persist_directory=conf["persist_dir"],
+        client_settings=chromadb.config.Settings(**chroma_settings)
+    )
+    return db
+
+
+def load_documents(source_dir: str):
+    # Loads all documents from source documents directory
+    all_files = []
+    for ext in LOADER_MAPPING:
+        all_files.extend(
+            glob.glob(os.path.join(source_dir, f"**/*{ext}"), recursive=True)
+        )
+    return [load_single_document(file_path) for file_path in all_files]
+
+
+def load_single_document(file_path: str):
+    logger.info("Loading document %s...", file_path)
+    ext = "." + file_path.rsplit(".", 1)[-1]
+    if ext in LOADER_MAPPING:
+        loader_class, loader_args = LOADER_MAPPING[ext]
+        loader = loader_class(file_path, **loader_args)
+        return loader.load()[0]
+
+    raise ValueError(f"Unsupported file extension '{ext}'")
+
+
+# Map file extensions to document loaders and their arguments
+LOADER_MAPPING = {
+    ".csv": (CSVLoader, {}),
+    # ".docx": (Docx2txtLoader, {}),
+    ".doc": (UnstructuredWordDocumentLoader, {}),
+    ".docx": (UnstructuredWordDocumentLoader, {}),
+    ".enex": (EverNoteLoader, {}),
+    ".epub": (UnstructuredEPubLoader, {}),
+    ".html": (UnstructuredHTMLLoader, {}),
+    ".md": (UnstructuredMarkdownLoader, {}),
+    ".odt": (UnstructuredODTLoader, {}),
+    ".pdf": (PDFMinerLoader, {}),
+    ".ppt": (UnstructuredPowerPointLoader, {}),
+    ".pptx": (UnstructuredPowerPointLoader, {}),
+    ".txt": (TextLoader, {"encoding": "utf8"}),
+    # Add more mappings for other file extensions and loaders as needed
+}
